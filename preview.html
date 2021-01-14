@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style>
+            .main-container {
+                display: flex;
+                flex-direction: column;
+            }
+            .image-container {
+                display: flex;
+                flex-direction: row;
+                justify-content: space-between;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>TITLE HERE</h1>
+        <div class="main-container">
+            {{range $element := .Panels}}
+                <div class="image-container">
+                    <img src={{$element.originalURL}} width="31%" height="500px"/>
+                    <img src={{$element.redactedURL}} width="31%" height="500px"/>
+                    <p>{{$element.text}}</p>
+                </div>
+                <br />
+            {{end}}
+        </div>
+    </body>
+</html>
