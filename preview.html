@@ -18,9 +18,9 @@
         <div class="main-container">
             {{range $element := .Panels}}
                 <div class="image-container">
-                    <img src={{$element.originalURL}} width="31%" height="500px"/>
-                    <img src={{$element.redactedURL}} width="31%" height="500px"/>
-                    <p>{{$element.text}}</p>
+                    <img src={{$element.OriginalFilePath}} width="31%" height="500px"/>
+                    <img src={{$element.RedactedImageBase64}} width="31%" height="500px"/>
+                    <p>{{$element.DetectedText}}</p>
                 </div>
                 <br />
             {{end}}
