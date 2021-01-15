@@ -8,13 +8,11 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
-<<<<<<< HEAD
 	"image"
 	"image/color"
 	"image/draw"
-=======
->>>>>>> ca554d7643267938f4a6af23fc4b9ea2fa252268
 	_ "image/jpeg"
+	"image/png"
 	_ "image/png"
 	"io"
 	"io/ioutil"
@@ -31,7 +29,7 @@ type Data struct {
 
 type Panel struct {
 	OriginalImageBase64 template.URL
-	RedactedImageBase64 string
+	RedactedImageBase64 template.URL
 	DetectedText        string
 }
 
@@ -114,7 +112,7 @@ func main() {
 		for _, str := range jsonResp.Text {
 			detectedText = detectedText + str + "\n"
 		}
-		panels = append(panels, Panel{OriginalImageBase64: template.URL("data:image/" + extension + ";base64," + encodeImage(file.Name())), RedactedImageBase64: "example", DetectedText: detectedText})
+		panels = append(panels, Panel{OriginalImageBase64: template.URL("data:image/" + extension + ";base64," + encodeImage(file.Name())), RedactedImageBase64: template.URL(redactImage(file.Name(), jsonResp.Boxes)), DetectedText: detectedText})
 	}
 	fmt.Println("Successfully initialized")
 	http.HandleFunc("/", indexHandler)
@@ -148,7 +146,7 @@ func encodeImage(imgPath string) string {
 	return encodedImage
 }
 
-func redactImage(imgPath string, boxes [][]int) *image.RGBA {
+func redactImage(imgPath string, boxes [][]int) string {
 	originalImage, err := os.Open(imgPath)
 	if err != nil {
 		log.Fatal(err)
@@ -166,8 +164,6 @@ func redactImage(imgPath string, boxes [][]int) *image.RGBA {
 	red := color.RGBA{255, 0, 0, 255}
 
 	for i := 0; i < len(boxes); i++ {
-		r := image.Rect(boxes[i][0], boxes[i][1], boxes[i][2], boxes[i][3])
-		fmt.Println(r)
 		line1 := image.Rect(boxes[i][0], boxes[i][1], boxes[i][2], boxes[i][1]+2)
 		line2 := image.Rect(boxes[i][2], boxes[i][1], boxes[i][2]+2, boxes[i][3]+2)
 		line3 := image.Rect(boxes[i][2], boxes[i][3], boxes[i][0], boxes[i][3]+2)
@@ -178,6 +174,11 @@ func redactImage(imgPath string, boxes [][]int) *image.RGBA {
 		draw.Draw(convertedOriginal, line4, &image.Uniform{red}, image.Point{boxes[i][0], boxes[i][1]}, draw.Src)
 	}
 
-	return convertedOriginal
+	var buff bytes.Buffer
 
+	png.Encode(&buff, convertedOriginal)
+
+	encodedString := "data:image/png;base64," + base64.StdEncoding.EncodeToString(buff.Bytes())
+
+	return encodedString
 }
