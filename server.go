@@ -7,6 +7,8 @@ import (
 	"flag"
 	"html/template"
 	"image"
+	"image/color"
+	"image/draw"
 	_ "image/jpeg"
 	_ "image/png"
 	"io/ioutil"
@@ -94,9 +96,9 @@ func encodeImage(imgPath string) string {
 	reader := bufio.NewReader(img)
 	content, _ := ioutil.ReadAll(reader)
 
-	encoded := base64.StdEncoding.EncodeToString(content)
+	encodedImage := base64.StdEncoding.EncodeToString(content)
 
-	return encoded
+	return encodedImage
 }
 
 // The img tag in html requires us to specify what type of image is being passed in (ie png, jpeg)
@@ -113,4 +115,18 @@ func getImageType(imgPath string) string {
 	}
 
 	return imgType
+}
+
+// Redacts image passed in
+// Boxes looks like this {"boxes":[[363,15,505,46],[14,15,178,62],[358,462,519,496],[3,417,109,495]]}
+func redactImage(imgPath string, boxes [][]int) {
+	originalImage, err := os.Open("levine_joshua_2.jpg")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	rectangle := image.NewRGBA(image.Rect(363, 15, 505, 46))
+	red := color.RGBA{255, 0, 0, 255}
+
+	draw.Draw(rectangle, rectangle.Bounds(), &image.Uniform{red}, image.ZP, draw.Src)
 }
