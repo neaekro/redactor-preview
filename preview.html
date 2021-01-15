@@ -9,7 +9,7 @@
             .image-container {
                 display: flex;
                 flex-direction: row;
-                justify-content: space-between;
+                justify-content: flex-start;
                 width: fit-content;
                 white-space: pre-line;
             }
@@ -20,8 +20,8 @@
         <div class="main-container">
             {{range $element := .Panels}}
                 <div class="image-container">
-                    <img src={{$element.OriginalImageBase64}} width="31%" height="500px"/>
-                    <img src={{$element.RedactedImageBase64}} width="31%" height="500px"/>
+                    <img src={{$element.OriginalImageBase64}} width="31%" height="500px" style="padding-right: 20px;"/>
+                    <img src={{$element.RedactedImageBase64}} width="31%" height="500px" style="padding-right: 20px;"/>
                     <p>{{$element.DetectedText}}</p>
                 </div>
                 <br />
