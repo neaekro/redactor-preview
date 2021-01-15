@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"flag"
@@ -9,8 +10,10 @@ import (
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
+	"io"
 	"io/ioutil"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
 )
@@ -26,7 +29,7 @@ type Panel struct {
 }
 
 type jsonResponse struct {
-	Boxes []int    `json:"boxes"`
+	Boxes [][]int  `json:"boxes"`
 	Text  []string `json:"text"`
 }
 
@@ -42,13 +45,47 @@ func main() {
 	} else {
 		path = *fileDirectory
 	}
-	files, _ := ioutil.ReadDir(path)
-	for i, file := range files {
-		file, err := os.Open(path + file.Name())
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	client := &http.Client{}
+	for _, file := range files {
+		file, err := os.Open(path + "/" + file.Name())
 		if err != nil {
 			log.Fatal(err)
 		}
-		response, err := http.Post("http://localhost:5000", "file", file)
+		values := map[string]io.Reader{
+			"file": file,
+		}
+		var b bytes.Buffer
+		w := multipart.NewWriter(&b)
+		for key, r := range values {
+			var fw io.Writer
+			if x, ok := r.(io.Closer); ok {
+				defer x.Close()
+			}
+			if x, ok := r.(*os.File); ok {
+				if fw, err = w.CreateFormFile(key, x.Name()); err != nil {
+					log.Fatal(err)
+				}
+			} else {
+				if fw, err = w.CreateFormField(key); err != nil {
+					log.Fatal(err)
+				}
+			}
+			if _, err = io.Copy(fw, r); err != nil {
+				log.Fatal(err)
+			}
+
+		}
+		w.Close()
+		req, err := http.NewRequest("POST", "http://localhost:5000", &b)
+		if err != nil {
+			log.Fatal(err)
+		}
+		req.Header.Set("Content-Type", w.FormDataContentType())
+		response, err := client.Do(req)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -65,9 +102,8 @@ func main() {
 		for _, str := range jsonResp.Text {
 			detectedText = detectedText + str + "\n"
 		}
-		panels[i] = Panel{OriginalFilePath: path + file.Name(), RedactedImageBase64: "example", DetectedText: detectedText}
+		panels = append(panels, Panel{OriginalFilePath: file.Name(), RedactedImageBase64: "example", DetectedText: detectedText})
 	}
-
 	http.HandleFunc("/", indexHandler)
 	http.ListenAndServe(":"+*listenPort, nil)
 }
