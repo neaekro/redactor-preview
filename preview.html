@@ -10,6 +10,7 @@
                 display: flex;
                 flex-direction: row;
                 justify-content: space-between;
+                width: fit-content;
             }
         </style>
     </head>
@@ -18,8 +19,8 @@
         <div class="main-container">
             {{range $element := .Panels}}
                 <div class="image-container">
-                    <img src={{$element.OriginalFilePath}} width="31%" height="500px"/>
-                    <img src={{$element.RedactedImageBase64}} width="31%" height="500px"/>
+                    <img src={{$element.OriginalFilePath}} alt="original image" width="45%" height="500px"/>
+                    <img src={{$element.RedactedImageBase64}} alt="redacted image" width="45%" height="500px"/>
                     <p>{{$element.DetectedText}}</p>
                 </div>
                 <br />

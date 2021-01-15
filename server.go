@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"html/template"
 	"image"
 	"image/color"
@@ -153,16 +154,36 @@ func getImageType(imgPath string) string {
 	return imgType
 }
 
-// Redacts image passed in
-// Boxes looks like this {"boxes":[[363,15,505,46],[14,15,178,62],[358,462,519,496],[3,417,109,495]]}
-func redactImage(imgPath string, boxes [][]int) {
-	originalImage, err := os.Open("levine_joshua_2.jpg")
+func redactImage(imgPath string, boxes [][]int) *image.RGBA {
+	originalImage, err := os.Open(imgPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	rectangle := image.NewRGBA(image.Rect(363, 15, 505, 46))
+	original, _, err := image.Decode(originalImage)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	b := original.Bounds()
+	convertedOriginal := image.NewRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
+	draw.Draw(convertedOriginal, convertedOriginal.Bounds(), original, b.Min, draw.Src)
+
 	red := color.RGBA{255, 0, 0, 255}
 
-	draw.Draw(rectangle, rectangle.Bounds(), &image.Uniform{red}, image.ZP, draw.Src)
+	for i := 0; i < len(boxes); i++ {
+		r := image.Rect(boxes[i][0], boxes[i][1], boxes[i][2], boxes[i][3])
+		fmt.Println(r)
+		line1 := image.Rect(boxes[i][0], boxes[i][1], boxes[i][2], boxes[i][1]+2)
+		line2 := image.Rect(boxes[i][2], boxes[i][1], boxes[i][2]+2, boxes[i][3]+2)
+		line3 := image.Rect(boxes[i][2], boxes[i][3], boxes[i][0], boxes[i][3]+2)
+		line4 := image.Rect(boxes[i][0], boxes[i][3], boxes[i][0]+2, boxes[i][1])
+		draw.Draw(convertedOriginal, line1, &image.Uniform{red}, image.Point{boxes[i][0], boxes[i][1]}, draw.Src)
+		draw.Draw(convertedOriginal, line2, &image.Uniform{red}, image.Point{boxes[i][0], boxes[i][1]}, draw.Src)
+		draw.Draw(convertedOriginal, line3, &image.Uniform{red}, image.Point{boxes[i][0], boxes[i][1]}, draw.Src)
+		draw.Draw(convertedOriginal, line4, &image.Uniform{red}, image.Point{boxes[i][0], boxes[i][1]}, draw.Src)
+	}
+
+	return convertedOriginal
+
 }
