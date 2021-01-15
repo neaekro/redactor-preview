@@ -6,8 +6,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"html/template"
-	"image"
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
@@ -16,6 +16,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"strings"
 )
 
 type Data struct {
@@ -23,7 +24,7 @@ type Data struct {
 }
 
 type Panel struct {
-	OriginalFilePath    string
+	OriginalImageBase64 template.URL
 	RedactedImageBase64 string
 	DetectedText        string
 }
@@ -51,6 +52,11 @@ func main() {
 	}
 	client := &http.Client{}
 	for _, file := range files {
+		splitString := strings.Split(file.Name(), ".")
+		extension := splitString[len(splitString)-1]
+		if extension == "jpg" {
+			extension = "jpeg"
+		}
 		file, err := os.Open(path + "/" + file.Name())
 		if err != nil {
 			log.Fatal(err)
@@ -102,8 +108,9 @@ func main() {
 		for _, str := range jsonResp.Text {
 			detectedText = detectedText + str + "\n"
 		}
-		panels = append(panels, Panel{OriginalFilePath: file.Name(), RedactedImageBase64: "example", DetectedText: detectedText})
+		panels = append(panels, Panel{OriginalImageBase64: template.URL("data:image/" + extension + ";base64," + encodeImage(file.Name())), RedactedImageBase64: "example", DetectedText: detectedText})
 	}
+	fmt.Println("Successfully initialized")
 	http.HandleFunc("/", indexHandler)
 	http.ListenAndServe(":"+*listenPort, nil)
 }
@@ -133,20 +140,4 @@ func encodeImage(imgPath string) string {
 	encoded := base64.StdEncoding.EncodeToString(content)
 
 	return encoded
-}
-
-// The img tag in html requires us to specify what type of image is being passed in (ie png, jpeg)
-// Ideally, this can be standarded by the redact function so this function is unnecessary
-func getImageType(imgPath string) string {
-	img, err := os.Open(imgPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	_, imgType, err := image.Decode(img)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return imgType
 }
