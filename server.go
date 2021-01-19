@@ -3,6 +3,8 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"embed"
+	_ "embed"
 	"encoding/base64"
 	"encoding/json"
 	"flag"
@@ -23,12 +25,12 @@ import (
 	"path/filepath"
 )
 
-// A wrapper for the panel array to be passed into our html template
+// Data is a wrapper for the panel array to be passed into our html template
 type Data struct {
 	Panels []Panel
 }
 
-// Data type representing a single "panel" or "row" in the html
+// Panel is a data type representing a single "panel" or "row" in the html
 type Panel struct {
 	OriginalImageBase64 template.URL
 	RedactedImageBase64 template.URL
@@ -46,7 +48,7 @@ func main() {
 	listenPort := flag.String("l", "8080", "Port to listen to")
 	fileDirectory := flag.String("d", ".", "Directory containing the images to be processed")
 	POSTRequestAddress := flag.String("a", "http://localhost:5000", "Address to send the POST request for python-redactor to; must include the beginning http://")
-	noredact := flag.Bool("noredact", false, "If present, python-redactor will be used and redacted images and detected text will be generated")
+	noredact := flag.Bool("noredact", false, "If present, python-redactor will not be used and the webapp will simply display the images unredacted")
 	flag.Parse()
 	var path string
 	if *fileDirectory == "." {
@@ -159,7 +161,9 @@ func preparePOSTRequest(filePath, POSTRequestAddress string) http.Request {
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	t, err := template.ParseFiles("preview.html")
+	//go:embed preview.html.tmpl
+	var content embed.FS
+	t, err := template.ParseFS(content, "preview.html.tmpl")
 	if err != nil {
 		log.Fatal(err)
 	}
