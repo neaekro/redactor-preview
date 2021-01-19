@@ -12,6 +12,10 @@
                 justify-content: flex-start;
                 width: fit-content;
                 white-space: pre-line;
+                padding-bottom: 20px;
+            }
+            img {
+                max-width: 80vh;
             }
         </style>
     </head>
@@ -20,8 +24,8 @@
         <div class="main-container">
             {{range $element := .Panels}}
                 <div class="image-container">
-                    <img src={{$element.OriginalImageBase64}} width="31%" height="500px" style="padding-right: 20px;"/>
-                    <img src={{$element.RedactedImageBase64}} width="31%" height="500px" style="padding-right: 20px;"/>
+                    <img src={{$element.OriginalImageBase64}} style="padding-right: 20px;"/>
+                    <img src={{$element.RedactedImageBase64}} style="padding-right: 20px;"/>
                     <p>{{$element.DetectedText}}</p>
                 </div>
                 <br />
