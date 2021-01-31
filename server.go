@@ -44,6 +44,9 @@ type redactorJSONResponse struct {
 
 var panels []Panel
 
+//go:embed preview.html.tmpl
+var content embed.FS
+
 func main() {
 	listenPort := flag.String("l", "8080", "Port to listen to")
 	fileDirectory := flag.String("d", ".", "Directory containing the images to be processed")
@@ -63,6 +66,7 @@ func main() {
 	processFiles(files, *noredact, path, *POSTRequestAddress)
 	fmt.Println("Successfully initialized")
 	http.HandleFunc("/", indexHandler)
+	http.HandleFunc("/img/", imgHandler)
 	http.ListenAndServe(":"+*listenPort, nil)
 }
 
@@ -161,8 +165,6 @@ func preparePOSTRequest(filePath, POSTRequestAddress string) http.Request {
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	//go:embed preview.html.tmpl
-	var content embed.FS
 	t, err := template.ParseFS(content, "preview.html.tmpl")
 	if err != nil {
 		log.Fatal(err)
@@ -170,6 +172,25 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	err = t.Execute(w, Data{Panels: panels})
 	if err != nil {
 		log.Fatal(err)
+	}
+}
+
+func imgHandler(w http.ResponseWriter, r *http.Request) {
+	// Some skeleton code for checking the GET request.
+	// If I understand correctly, Adam wants us generate the images with boxes based on this request
+	// So that means we should move the redactImage function in here?? Need to refactor processFiles as well then?
+	// Site Adam linked: https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang
+	// Should probably look like their writeImageWithTemplate method
+	param := r.URL.Query()
+	if param.Get("redacted") == "yes" {
+		t, err := template.ParseFS(content, "preview.html.tmpl")
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = t.Execute(w, Data{Panels: panels})
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 
