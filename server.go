@@ -71,18 +71,23 @@ func main() {
 	}
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println("Oops, there was an error in reading the directory provided. Maybe I don't have the right permissions?")
+		fmt.Println("Exiting...")
+		return
 	}
-	processFiles(files, path, *POSTRequestAddress)
+	processFiles(files, path)
 	fmt.Println("Successfully initialized")
+	fmt.Println("Listening at http://localhost:" + *listenPort)
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/img/", imgHandler)
 	if err := http.ListenAndServe(":"+*listenPort, nil); err != nil {
-		log.Fatal("ListenAndServe: ", err)
+		log.Println("ListenAndServe: ", err)
+		fmt.Println("There was an error hosting on the specified port")
+		fmt.Println("Exiting...")
 	}
 }
 
-func processFiles(files []os.FileInfo, path, POSTRequestAddress string) {
+func processFiles(files []os.FileInfo, path string) {
 	validExtensions := map[string]bool{"jpeg": true, "png": true}
 	for _, file := range files {
 		if file.IsDir() {
@@ -195,7 +200,9 @@ func imgHandler(w http.ResponseWriter, r *http.Request) {
 	client := &http.Client{}
 	response, err := client.Do(&POSTRequest)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		fmt.Println("Perhaps you didn't run the python-redactor?")
+		return
 	}
 	jsonResp, detectedText, err := unwrapRedactorResponse(*response)
 	if err != nil {
@@ -216,7 +223,13 @@ func imgHandler(w http.ResponseWriter, r *http.Request) {
 func encodeImage(imgPath, extension string) template.URL {
 	img, err := os.Open(imgPath)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println("There was an error reading one of the images; replacing with a filler")
+		file, err := os.ReadFile("404.txt")
+		if err != nil {
+			fmt.Println("Wow, looks like I can't even open my filler image :(")
+			return template.URL("")
+		}
+		return template.URL(string(file))
 	}
 
 	reader := bufio.NewReader(img)
