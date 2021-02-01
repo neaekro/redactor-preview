@@ -25,8 +25,8 @@
             {{range $element := .Panels}}
                 <div class="image-container">
                     <img src={{$element.OriginalImageBase64}} style="padding-right: 20px;"/>
-                    <img src={{$element.RedactedImageBase64}} style="padding-right: 20px;"/>
-                    <p>{{$element.DetectedText}}</p>
+                    <img style="padding-right: 20px;"/>
+                    <p></p>
                 </div>
             {{end}}
         </div>
@@ -35,27 +35,18 @@
             var i, imageDiv, redacted, text;
             var mainContainer = document.getElementById("main");
             // Array of image-container divs
-            var imageContainers = mainContainer.getElementsByTagName("DIV")
+            var imageContainers = mainContainer.getElementsByTagName("div")
             const url = window.location.hostname + ":" + window.location.port
             for (i = 0; i < imageContainers.length; i++) {
-                
                 const http = new XMLHttpRequest();
-                var requestURL = url + "/img/?panelIndex=" + i.toString();
-                http.open("GET", requestURL);
+                var requestURL = "http://" + url + "/img/?panelIndex=" + i.toString();
+                http.open("GET", requestURL, false);
                 http.send();
-
-                http.onreadystatechange = function() {
-                    if (this.readyState == 4 && this.status == 200) {
-                        var response = JSON.parse(http.responseText)
-                        imageDiv = imageContainers[i];
-                        redacted = imageDiv.getElementsByTagName("IMG")[1].src = response.RedactedImageBase64
-                        text = imageDiv.getElementsByTagName("P")[0].innerHTML = response.DetectedText
-                    }
-                }
-
-                // console.log("currently at page: ", url)
-                // console.log("current port: ", window.location.port)
-                // console.log("at iteration number: ", i)
+                var response = JSON.parse(http.responseText)
+                imageDiv = imageContainers[i];
+                imageDiv.getElementsByTagName("img")[1].src = response.RedactedImageBase64
+                imageDiv.getElementsByTagName("p")[0].innerHTML = response.DetectedText
+                console.log(i)
             }
         }
     </script>
