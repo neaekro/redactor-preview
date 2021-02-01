@@ -52,13 +52,17 @@ var noredact bool
 var POSTRequestAddress string
 
 //go:embed preview.html.tmpl
-var content embed.FS
+var preview embed.FS
+
+//go:embed previewNoredact.html.tmpl
+var previewNoredact embed.FS
 
 func main() {
 	listenPort := flag.String("l", "8080", "Port to listen to")
 	fileDirectory := flag.String("d", ".", "Directory containing the images to be processed")
 	POSTRequestAddress = *flag.String("a", "http://localhost:5000", "Address to send the POST request for python-redactor to; must include the beginning http://")
 	noredact = *flag.Bool("noredact", false, "If present, python-redactor will not be used and the webapp will simply display the images unredacted")
+	fmt.Println(noredact)
 	flag.Parse()
 	var path string
 	if *fileDirectory == "." {
@@ -160,7 +164,7 @@ func preparePOSTRequest(filePath, POSTRequestAddress string) http.Request {
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	if !noredact {
-		t, err := template.ParseFS(content, "preview.html.tmpl")
+		t, err := template.ParseFS(preview, "preview.html.tmpl")
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -169,16 +173,18 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 			log.Fatal(err)
 		}
 	} else {
-
+		t, err := template.ParseFS(previewNoredact, "previewNoredact.html.tmpl")
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = t.Execute(w, Data{Panels: panels})
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 
 func imgHandler(w http.ResponseWriter, r *http.Request) {
-	// Some skeleton code for checking the GET request.
-	// If I understand correctly, Adam wants us generate the images with boxes based on this request
-	// So that means we should move the redactImage function in here?? Need to refactor processFiles as well then?
-	// Site Adam linked: https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang
-	// Should probably look like their writeImageWithTemplate method
 	param := r.URL.Query()
 	panelIndex, _ := strconv.Atoi(param.Get("panelIndex"))
 	workingPanel := panels[panelIndex]

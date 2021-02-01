@@ -34,16 +34,15 @@
         function updateRedactedImagesAndText() {
             var i, redacted, text;
             var mainContainer = document.getElementById("main");
-            var imageContainers = mainContainer.getElementsByTagName("DIV")
+            var imageContainers = mainContainer.getElementsByTagName("div")
             const url = window.location.hostname + ":" + window.location.port
             for (i = 0; i < imageContainers.length; i++) {
-                
                 const http = new XMLHttpRequest();
                 var requestURL = "http://" + url + "/img/?panelIndex=" + i.toString();
-                var imageDiv = imageContainers[i].children;
                 http.open("GET", requestURL, false);
                 http.send();
                 var response = JSON.parse(http.responseText);
+                var imageDiv = imageContainers[i].children;
                 imageDiv.item(1).src = response.RedactedImageBase64;
                 imageDiv.item(2).innerHTML = response.DetectedText;
             }
