@@ -48,8 +48,8 @@ type JSONReturn struct {
 }
 
 var panels []Panel
-var noredact bool
-var POSTRequestAddress string
+var noredact *bool
+var POSTRequestAddress *string
 
 //go:embed preview.html.tmpl
 var preview embed.FS
@@ -60,9 +60,8 @@ var previewNoredact embed.FS
 func main() {
 	listenPort := flag.String("l", "8080", "Port to listen to")
 	fileDirectory := flag.String("d", ".", "Directory containing the images to be processed")
-	POSTRequestAddress = *flag.String("a", "http://localhost:5000", "Address to send the POST request for python-redactor to; must include the beginning http://")
-	noredact = *flag.Bool("noredact", false, "If present, python-redactor will not be used and the webapp will simply display the images unredacted")
-	fmt.Println(noredact)
+	POSTRequestAddress = flag.String("a", "http://localhost:5000", "Address to send the POST request for python-redactor to; must include the beginning http://")
+	noredact = flag.Bool("noredact", false, "If present, python-redactor will not be used and the webapp will simply display the images unredacted")
 	flag.Parse()
 	var path string
 	if *fileDirectory == "." {
@@ -74,7 +73,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	processFiles(files, path, POSTRequestAddress)
+	processFiles(files, path, *POSTRequestAddress)
 	fmt.Println("Successfully initialized")
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/img/", imgHandler)
@@ -163,7 +162,7 @@ func preparePOSTRequest(filePath, POSTRequestAddress string) http.Request {
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	if !noredact {
+	if !*noredact {
 		t, err := template.ParseFS(preview, "preview.html.tmpl")
 		if err != nil {
 			log.Fatal(err)
@@ -188,7 +187,7 @@ func imgHandler(w http.ResponseWriter, r *http.Request) {
 	param := r.URL.Query()
 	panelIndex, _ := strconv.Atoi(param.Get("panelIndex"))
 	workingPanel := panels[panelIndex]
-	POSTRequest := preparePOSTRequest(workingPanel.FilePath, POSTRequestAddress)
+	POSTRequest := preparePOSTRequest(workingPanel.FilePath, *POSTRequestAddress)
 	client := &http.Client{}
 	response, err := client.Do(&POSTRequest)
 	if err != nil {
