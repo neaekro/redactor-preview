@@ -183,18 +183,21 @@ func imgHandler(w http.ResponseWriter, r *http.Request) {
 	// Should probably look like their writeImageWithTemplate method
 	param := r.URL.Query()
 	if param.Get("redacted") == "yes" {
-		t, err := template.ParseFS(content, "preview.html.tmpl")
-		if err != nil {
-			log.Fatal(err)
-		}
-		err = t.Execute(w, Data{Panels: panels})
-		if err != nil {
-			log.Fatal(err)
-		}
+		fmt.Fprint(w, "hi hi")
+		/*
+			t, err := template.ParseFS(content, "preview.html.tmpl")
+			if err != nil {
+				log.Fatal(err)
+			}
+			err = t.Execute(w, Data{Panels: panels})
+			if err != nil {
+				log.Fatal(err)
+			}
+		*/
 	}
 }
 
-// Needs to be in the form of "data:image/" + getImageType(fn) + ";base64," + encodeImage(fn)
+// Returns in the form of "data:image/" + getImageType(fn) + ";base64," + encodeImage(fn)
 func encodeImage(imgPath, extension string) template.URL {
 	img, err := os.Open(imgPath)
 	if err != nil {
