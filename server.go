@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
 // Data is a wrapper for the panel array to be passed into our html template
@@ -33,8 +34,7 @@ type Data struct {
 // Panel is a data type representing a single "panel" or "row" in the html
 type Panel struct {
 	OriginalImageBase64 template.URL
-	RedactedImageBase64 template.URL
-	DetectedText        string
+	FilePath            string
 }
 
 type redactorJSONResponse struct {
@@ -42,7 +42,14 @@ type redactorJSONResponse struct {
 	Text  []string `json:"text"`
 }
 
+type JSONReturn struct {
+	RedactedImageBase64 string
+	DetectedText        string
+}
+
 var panels []Panel
+var noredact bool
+var POSTRequestAddress string
 
 //go:embed preview.html.tmpl
 var content embed.FS
@@ -50,8 +57,8 @@ var content embed.FS
 func main() {
 	listenPort := flag.String("l", "8080", "Port to listen to")
 	fileDirectory := flag.String("d", ".", "Directory containing the images to be processed")
-	POSTRequestAddress := flag.String("a", "http://localhost:5000", "Address to send the POST request for python-redactor to; must include the beginning http://")
-	noredact := flag.Bool("noredact", false, "If present, python-redactor will not be used and the webapp will simply display the images unredacted")
+	POSTRequestAddress = *flag.String("a", "http://localhost:5000", "Address to send the POST request for python-redactor to; must include the beginning http://")
+	noredact = *flag.Bool("noredact", false, "If present, python-redactor will not be used and the webapp will simply display the images unredacted")
 	flag.Parse()
 	var path string
 	if *fileDirectory == "." {
@@ -63,15 +70,16 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	processFiles(files, *noredact, path, *POSTRequestAddress)
+	processFiles(files, path, POSTRequestAddress)
 	fmt.Println("Successfully initialized")
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/img/", imgHandler)
-	http.ListenAndServe(":"+*listenPort, nil)
+	if err := http.ListenAndServe(":"+*listenPort, nil); err != nil {
+		log.Fatal("ListenAndServe: ", err)
+	}
 }
 
-func processFiles(files []os.FileInfo, noredact bool, path, POSTRequestAddress string) {
-	client := &http.Client{}
+func processFiles(files []os.FileInfo, path, POSTRequestAddress string) {
 	validExtensions := map[string]bool{"jpeg": true, "png": true}
 	for _, file := range files {
 		if file.IsDir() {
@@ -86,21 +94,7 @@ func processFiles(files []os.FileInfo, noredact bool, path, POSTRequestAddress s
 			continue
 		}
 		filePath := path + "/" + file.Name()
-		if !noredact {
-			POSTRequest := preparePOSTRequest(filePath, POSTRequestAddress)
-			response, err := client.Do(&POSTRequest)
-			if err != nil {
-				log.Fatal(err)
-			}
-			jsonResp, detectedText, err := unwrapRedactorResponse(*response)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			panels = append(panels, Panel{OriginalImageBase64: encodeImage(filePath, extension), RedactedImageBase64: redactImage(filePath, jsonResp.Boxes), DetectedText: detectedText})
-		} else {
-			panels = append(panels, Panel{OriginalImageBase64: encodeImage(filePath, extension)})
-		}
+		panels = append(panels, Panel{OriginalImageBase64: encodeImage(filePath, extension), FilePath: filePath})
 	}
 }
 
@@ -165,13 +159,17 @@ func preparePOSTRequest(filePath, POSTRequestAddress string) http.Request {
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	t, err := template.ParseFS(content, "preview.html.tmpl")
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = t.Execute(w, Data{Panels: panels})
-	if err != nil {
-		log.Fatal(err)
+	if !noredact {
+		t, err := template.ParseFS(content, "preview.html.tmpl")
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = t.Execute(w, Data{Panels: panels})
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+
 	}
 }
 
@@ -182,16 +180,27 @@ func imgHandler(w http.ResponseWriter, r *http.Request) {
 	// Site Adam linked: https://www.sanarias.com/blog/1214PlayingwithimagesinHTTPresponseingolang
 	// Should probably look like their writeImageWithTemplate method
 	param := r.URL.Query()
-	if param.Get("redacted") == "yes" {
-		t, err := template.ParseFS(content, "preview.html.tmpl")
-		if err != nil {
-			log.Fatal(err)
-		}
-		err = t.Execute(w, Data{Panels: panels})
-		if err != nil {
-			log.Fatal(err)
-		}
+	panelIndex, _ := strconv.Atoi(param.Get("panelIndex"))
+	workingPanel := panels[panelIndex]
+	POSTRequest := preparePOSTRequest(workingPanel.FilePath, POSTRequestAddress)
+	client := &http.Client{}
+	response, err := client.Do(&POSTRequest)
+	if err != nil {
+		log.Fatal(err)
 	}
+	jsonResp, detectedText, err := unwrapRedactorResponse(*response)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	returnValue := JSONReturn{RedactedImageBase64: redactImage(workingPanel.FilePath, jsonResp.Boxes), DetectedText: detectedText}
+	jsonData, err := json.Marshal(returnValue)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonData)
 }
 
 // Needs to be in the form of "data:image/" + getImageType(fn) + ";base64," + encodeImage(fn)
@@ -209,7 +218,7 @@ func encodeImage(imgPath, extension string) template.URL {
 	return template.URL("data:image/" + extension + ";base64," + encodedImage)
 }
 
-func redactImage(imgPath string, boxes [][]int) template.URL {
+func redactImage(imgPath string, boxes [][]int) string {
 	originalImage, err := os.Open(imgPath)
 	if err != nil {
 		log.Fatal(err)
@@ -243,5 +252,5 @@ func redactImage(imgPath string, boxes [][]int) template.URL {
 
 	encodedString := "data:image/png;base64," + base64.StdEncoding.EncodeToString(buff.Bytes())
 
-	return template.URL(encodedString)
+	return encodedString
 }
