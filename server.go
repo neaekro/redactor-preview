@@ -88,7 +88,11 @@ func processFiles(files []os.FileInfo, path, POSTRequestAddress string) {
 		if file.IsDir() {
 			continue
 		}
-		extension := filepath.Ext(file.Name())[1:]
+		extension := filepath.Ext(file.Name())
+		if extension == "" {
+			continue
+		}
+		extension = extension[1:]
 		// if extension is jpg, it must be renamed to jpeg for the base64 image encoding to decode properly
 		if extension == "jpg" {
 			extension = "jpeg"
