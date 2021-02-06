@@ -71,6 +71,7 @@ func main() {
 	}
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
+		log.Println("ReadDir: ", err)
 		fmt.Println("Oops, there was an error in reading the directory provided. Maybe I don't have the right permissions?")
 		fmt.Println("Exiting...")
 		return
@@ -113,7 +114,7 @@ func processFiles(files []os.FileInfo, path string) {
 func unwrapRedactorResponse(response http.Response) (redactorJSONResponse, string, error) {
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		log.Fatal(err)
+		return redactorJSONResponse{}, "", err
 	}
 	var jsonResp = new(redactorJSONResponse)
 	err = json.Unmarshal(body, &jsonResp)
@@ -133,14 +134,11 @@ func organizeDetectedText(text []string) string {
 }
 
 // Source : https://stackoverflow.com/questions/20205796/post-data-using-the-content-type-multipart-form-data
-func preparePOSTRequest(filePath, POSTRequestAddress string) http.Request {
-	file, err := os.Open(filePath)
-	if err != nil {
-		log.Fatal(err)
-	}
+func preparePOSTRequest(file *os.File, POSTRequestAddress string) (http.Request, error) {
 	values := map[string]io.Reader{
 		"file": file,
 	}
+	var err error
 	var b bytes.Buffer
 	w := multipart.NewWriter(&b)
 	for key, r := range values {
@@ -150,53 +148,67 @@ func preparePOSTRequest(filePath, POSTRequestAddress string) http.Request {
 		}
 		if x, ok := r.(*os.File); ok {
 			if fw, err = w.CreateFormFile(key, x.Name()); err != nil {
-				log.Fatal(err)
+				return http.Request{}, err
 			}
 		} else {
 			if fw, err = w.CreateFormField(key); err != nil {
-				log.Fatal(err)
+				return http.Request{}, err
 			}
 		}
 		if _, err = io.Copy(fw, r); err != nil {
-			log.Fatal(err)
+			return http.Request{}, err
 		}
 	}
 	w.Close()
 	req, err := http.NewRequest("POST", POSTRequestAddress, &b)
 	if err != nil {
-		log.Fatal(err)
+		return http.Request{}, err
 	}
 	req.Header.Set("Content-Type", w.FormDataContentType())
-	return *req
+	return *req, nil
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	if !*noredact {
 		t, err := template.ParseFS(preview, "preview.html.tmpl")
 		if err != nil {
-			log.Fatal(err)
+			log.Println("Error parsing html template: ", err)
+			return
 		}
 		err = t.Execute(w, Data{Panels: panels})
 		if err != nil {
-			log.Fatal(err)
+			log.Println("Error executing html template: ", err)
+			return
 		}
 	} else {
 		t, err := template.ParseFS(previewNoredact, "previewNoredact.html.tmpl")
 		if err != nil {
-			log.Fatal(err)
+			log.Println("Error parsing html template: ", err)
+			return
 		}
 		err = t.Execute(w, Data{Panels: panels})
 		if err != nil {
-			log.Fatal(err)
+			log.Println("Error executing html template: ", err)
+			return
 		}
 	}
 }
 
 func imgHandler(w http.ResponseWriter, r *http.Request) {
 	param := r.URL.Query()
-	panelIndex, _ := strconv.Atoi(param.Get("panelIndex"))
+	panelIndex, err := strconv.Atoi(param.Get("panelIndex"))
+	if err != nil {
+		log.Println("No panelIndex parameter passed?")
+		log.Println(err)
+		return
+	}
 	workingPanel := panels[panelIndex]
-	POSTRequest := preparePOSTRequest(workingPanel.FilePath, *POSTRequestAddress)
+	file, err := os.Open(workingPanel.FilePath)
+	POSTRequest, err := preparePOSTRequest(file, *POSTRequestAddress)
+	if err != nil {
+		log.Println("Error creating POST request: ", err)
+		return
+	}
 	client := &http.Client{}
 	response, err := client.Do(&POSTRequest)
 	if err != nil {
@@ -206,13 +218,13 @@ func imgHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonResp, detectedText, err := unwrapRedactorResponse(*response)
 	if err != nil {
-		log.Println(err)
+		log.Println("Error unwrapping response: ", err)
 		return
 	}
 	returnValue := JSONReturn{RedactedImageBase64: redactImage(workingPanel.FilePath, jsonResp.Boxes), DetectedText: detectedText}
 	jsonData, err := json.Marshal(returnValue)
 	if err != nil {
-		log.Println(err)
+		log.Println("Error wrapping return into a JSON: ", err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -243,12 +255,24 @@ func encodeImage(imgPath, extension string) template.URL {
 func redactImage(imgPath string, boxes [][]int) string {
 	originalImage, err := os.Open(imgPath)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println("There was an error reading one of the images; replacing with a filler")
+		file, err := os.ReadFile("404.txt")
+		if err != nil {
+			fmt.Println("Wow, looks like I can't even open my filler image :(")
+			return ""
+		}
+		return string(file)
 	}
 
 	original, _, err := image.Decode(originalImage)
 	if err != nil {
-		log.Fatal(err)
+		log.Println("Error decoding one of the images: ", err)
+		file, err := os.ReadFile("404.txt")
+		if err != nil {
+			fmt.Println("Wow, looks like I can't even open my filler image :(")
+			return ""
+		}
+		return string(file)
 	}
 
 	b := original.Bounds()
