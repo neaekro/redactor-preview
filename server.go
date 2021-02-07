@@ -198,33 +198,36 @@ func imgHandler(w http.ResponseWriter, r *http.Request) {
 	param := r.URL.Query()
 	panelIndex, err := strconv.Atoi(param.Get("panelIndex"))
 	if err != nil {
-		log.Println("No panelIndex parameter passed?")
-		log.Println(err)
+		log.Println("No panelIndex parameter passed? ", err)
 		return
 	}
 	workingPanel := panels[panelIndex]
 	file, err := os.Open(workingPanel.FilePath)
+	if err != nil {
+		log.Println("Error reading "+workingPanel.FilePath+": ", err)
+		return
+	}
 	POSTRequest, err := preparePOSTRequest(file, *POSTRequestAddress)
 	if err != nil {
-		log.Println("Error creating POST request: ", err)
+		log.Println("Error creating POST request for file "+workingPanel.FilePath+": ", err)
 		return
 	}
 	client := &http.Client{}
 	response, err := client.Do(&POSTRequest)
 	if err != nil {
-		log.Println(err)
+		log.Println("Error sending POST request for "+workingPanel.FilePath+": ", err)
 		fmt.Println("Perhaps you didn't run the python-redactor?")
 		return
 	}
 	jsonResp, detectedText, err := unwrapRedactorResponse(*response)
 	if err != nil {
-		log.Println("Error unwrapping response: ", err)
+		log.Println("Error unwrapping response for "+workingPanel.FilePath+": ", err)
 		return
 	}
 	returnValue := JSONReturn{RedactedImageBase64: redactImage(workingPanel.FilePath, jsonResp.Boxes), DetectedText: detectedText}
 	jsonData, err := json.Marshal(returnValue)
 	if err != nil {
-		log.Println("Error wrapping return into a JSON: ", err)
+		log.Println("Error wrapping return into a JSON for "+workingPanel.FilePath+": ", err)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -235,7 +238,7 @@ func imgHandler(w http.ResponseWriter, r *http.Request) {
 func encodeImage(imgPath, extension string) template.URL {
 	img, err := os.Open(imgPath)
 	if err != nil {
-		fmt.Println("There was an error reading one of the images; replacing with a filler")
+		fmt.Println("There was an error reading " + imgPath + "; replacing with a filler")
 		file, err := os.ReadFile("404.txt")
 		if err != nil {
 			fmt.Println("Wow, looks like I can't even open my filler image :(")
@@ -255,7 +258,7 @@ func encodeImage(imgPath, extension string) template.URL {
 func redactImage(imgPath string, boxes [][]int) string {
 	originalImage, err := os.Open(imgPath)
 	if err != nil {
-		fmt.Println("There was an error reading one of the images; replacing with a filler")
+		fmt.Println("There was an error reading " + imgPath + "; replacing with a filler")
 		file, err := os.ReadFile("404.txt")
 		if err != nil {
 			fmt.Println("Wow, looks like I can't even open my filler image :(")
@@ -266,7 +269,7 @@ func redactImage(imgPath string, boxes [][]int) string {
 
 	original, _, err := image.Decode(originalImage)
 	if err != nil {
-		log.Println("Error decoding one of the images: ", err)
+		log.Println("Error decoding "+imgPath+": ", err)
 		file, err := os.ReadFile("404.txt")
 		if err != nil {
 			fmt.Println("Wow, looks like I can't even open my filler image :(")
