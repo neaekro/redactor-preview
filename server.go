@@ -50,6 +50,7 @@ type JSONReturn struct {
 var panels []Panel
 var noredact *bool
 var POSTRequestAddress *string
+var boxredact *bool
 
 //go:embed preview.html.tmpl
 var preview embed.FS
@@ -62,6 +63,7 @@ func main() {
 	fileDirectory := flag.String("d", ".", "Directory containing the images to be processed")
 	POSTRequestAddress = flag.String("a", "http://localhost:5000", "Address to send the POST request for python-redactor to; must include the beginning http://")
 	noredact = flag.Bool("noredact", false, "If present, python-redactor will not be used and the webapp will simply display the images unredacted")
+	boxredact = flag.Bool("boxredact", false, "If true, detected text will be overriden with a red box")
 	flag.Parse()
 	var path string
 	if *fileDirectory == "." {
@@ -284,15 +286,22 @@ func redactImage(imgPath string, boxes [][]int) string {
 
 	red := color.RGBA{255, 0, 0, 255}
 
-	for i := 0; i < len(boxes); i++ {
-		line1 := image.Rect(boxes[i][0], boxes[i][1], boxes[i][2], boxes[i][1]+2)
-		line2 := image.Rect(boxes[i][2], boxes[i][1], boxes[i][2]+2, boxes[i][3]+2)
-		line3 := image.Rect(boxes[i][2], boxes[i][3], boxes[i][0], boxes[i][3]+2)
-		line4 := image.Rect(boxes[i][0], boxes[i][3], boxes[i][0]+2, boxes[i][1])
-		draw.Draw(convertedOriginal, line1, &image.Uniform{red}, image.Point{boxes[i][0], boxes[i][1]}, draw.Src)
-		draw.Draw(convertedOriginal, line2, &image.Uniform{red}, image.Point{boxes[i][0], boxes[i][1]}, draw.Src)
-		draw.Draw(convertedOriginal, line3, &image.Uniform{red}, image.Point{boxes[i][0], boxes[i][1]}, draw.Src)
-		draw.Draw(convertedOriginal, line4, &image.Uniform{red}, image.Point{boxes[i][0], boxes[i][1]}, draw.Src)
+	if !*boxredact {
+		for i := 0; i < len(boxes); i++ {
+			line1 := image.Rect(boxes[i][0], boxes[i][1], boxes[i][2], boxes[i][1]+2)
+			line2 := image.Rect(boxes[i][2], boxes[i][1], boxes[i][2]+2, boxes[i][3]+2)
+			line3 := image.Rect(boxes[i][2], boxes[i][3], boxes[i][0], boxes[i][3]+2)
+			line4 := image.Rect(boxes[i][0], boxes[i][3], boxes[i][0]+2, boxes[i][1])
+			draw.Draw(convertedOriginal, line1, &image.Uniform{red}, image.Point{boxes[i][0], boxes[i][1]}, draw.Src)
+			draw.Draw(convertedOriginal, line2, &image.Uniform{red}, image.Point{boxes[i][0], boxes[i][1]}, draw.Src)
+			draw.Draw(convertedOriginal, line3, &image.Uniform{red}, image.Point{boxes[i][0], boxes[i][1]}, draw.Src)
+			draw.Draw(convertedOriginal, line4, &image.Uniform{red}, image.Point{boxes[i][0], boxes[i][1]}, draw.Src)
+		}
+	} else {
+		for i := 0; i < len(boxes); i++ {
+			box := image.Rect(boxes[i][0], boxes[i][1], boxes[i][2], boxes[i][3])
+			draw.Draw(convertedOriginal, box, &image.Uniform{red}, image.Point{boxes[i][0], boxes[i][1]}, draw.Src)
+		}
 	}
 
 	var buff bytes.Buffer
