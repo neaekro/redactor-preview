@@ -66,6 +66,11 @@ func main() {
 	boxredact = flag.Bool("boxredact", false, "If true, detected text will be overriden with a red box")
 	flag.Parse()
 	var path string
+	if *noredact && *boxredact {
+		fmt.Println("Oops, cannot pass both -noredact and -boxredact together. You can't redact and not redact at the same time!")
+		fmt.Println("Exiting...")
+		return
+	}
 	if *fileDirectory == "." {
 		path, _ = os.Getwd()
 	} else {
